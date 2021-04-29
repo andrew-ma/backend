@@ -5,7 +5,7 @@ const tokens = require("./tokens.json");
 router.get("/:tokenId", async (ctx, next) => {
     const tokenURI = tokens[ctx.params.tokenId];
     // FAILURE: tokenId not in tokens.json file
-    if (typeof token === "undefined") {
+    if (typeof tokenURI === "undefined") {
         ctx.status = 400;
         ctx.body = {
             error: `tokenId ${ctx.params.tokenId} does not exist`,
