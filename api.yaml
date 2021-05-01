@@ -22,12 +22,40 @@ paths:
       responses:
         200:
           description: A metadata has been created for that tokenId
-        400:
+          schema:
+            type: object
+            required:
+            - tokenId
+            - name
+            - description
+            - image
+            properties:
+              tokenId:
+                type: integer
+                minimum: 0
+              name:
+                type: string
+              description:
+                type: string
+              image:
+                type: string
+        404:
           description: There is no metadata assigned to that tokenId
+          schema:
+            type: object
+            required:
+            - error
+            properties:
+              error: 
+                type: string
+                
+                
     post:
       summary: Create a new metadata assigned to tokenId
       consumes:
       - application/json
+      produces:
+        - application/json
       parameters:
       - in: body
         name: metadataForNewTokenId
@@ -35,25 +63,40 @@ paths:
           type: object
           required:
           - tokenId
-          - result
+          - name
+          - description
+          - image
           properties:
             tokenId:
               type: integer
               minimum: 0
-            result:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                image:
-                  type: string
-                
+            name:
+              type: string
+            description:
+              type: string
+            image:
+              type: string
               
               
       responses:
         201:
           description: tokenId has not been already assigned to any metadata, and we Created new assignment
-        400:
+          schema:
+            type: object
+            required:
+            - tokenId
+            properties:
+              tokenId: 
+                type: integer
+                minimum: 0
+                
+
+        409:
           description: There is an existing metadata assigned to that tokenId
+          schema:
+            type: object
+            required:
+            - error
+            properties:
+              error: 
+                type: string
