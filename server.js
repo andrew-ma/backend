@@ -6,9 +6,13 @@ const swagger = require("swagger2");
 const { ui, validate } = require("swagger2-koa");
 const router = require("./router.js");
 
-const swaggerDocument = swagger.loadDocumentSync("api.yaml");
-
 const app = new Koa();
+
+const swaggerDocument = swagger.loadDocumentSync("api.yaml");
+// validate document
+if (!swagger.validateDocument(swaggerDocument)) {
+    throw Error(`./api.yml does not conform to the Swagger 2.0 schema`);
+}
 
 const PORT = process.env.PORT || 4000;
 
