@@ -16,7 +16,7 @@ console.log(`Running koa server on port ${PORT}...`);
 app.use(bodyParser());
 app.use(cors());
 app.use(serve("./images"));
-app.use(ui(swaggerDocument, "/"));
+app.use(ui(swaggerDocument, "/swagger"));
 app.use(validate(swaggerDocument));
 app.use(router.routes());
 app.use(router.allowedMethods());
