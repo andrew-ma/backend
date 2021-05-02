@@ -5,16 +5,17 @@ const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs").promises;
 
-const models = require("./models");
+// Importing models that were loaded with index.js
+const Metadata = require("./models").Metadata;
 
 router.get("/:tokenId", async (ctx, next) => {
-    try {
-        const TOKENS_FILE_DATA = await fsPromises.readFile(path.join(__dirname, "tokens.json"));
-        const TOKENS_DB = JSON.parse(TOKENS_FILE_DATA);
-        const tokenMetadata = TOKENS_DB[ctx.params.tokenId];
+    const tokenIdParam = parseInt(ctx.params.tokenId);
 
-        // FAILURE: tokenId not in tokens.json file
-        if (typeof tokenMetadata === "undefined") {
+    try {
+        const tokenMetadata = await Metadata.getTokenMetadata(tokenIdParam);
+
+        // FAILURE: tokenId primary key is not in database
+        if (tokenMetadata === null) {
             ctx.status = 404;
             ctx.body = {
                 error: `tokenId ${ctx.params.tokenId} does not exist`,
@@ -22,12 +23,9 @@ router.get("/:tokenId", async (ctx, next) => {
             return;
         }
 
-        // SUCCESS: if tokenId is in tokens.json file
+        // SUCCESS: if tokenId is in database
         ctx.status = 200;
-        ctx.body = {
-            tokenId: parseInt(ctx.params.tokenId),
-            ...tokenMetadata,
-        };
+        ctx.body = tokenMetadata;
 
         console.log(`${next}`);
     } catch (error) {
