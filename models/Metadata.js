@@ -5,7 +5,6 @@ module.exports = (sequelize) => {
         // Class Methods (start with static)
 
         static async getTokenMetadata(tokenId) {
-            // findByPk gets only 1 entry from the table by Primary Key
             const tokenMetadata = await Metadata.findOne({
                 where: {
                     tokenId: tokenId,
@@ -14,12 +13,31 @@ module.exports = (sequelize) => {
             });
 
             if (tokenMetadata === null) {
+                // FAILURE:
                 console.log(`Got null metadata for ${tokenId}`);
                 return null;
             }
 
             console.log("\n", tokenMetadata.toJSON(), "\n");
             return tokenMetadata.toJSON();
+        }
+
+        static async postTokenMetadata(tokenId, name, description, image) {
+            // First, check to see if tokenId is already in database
+            if ((await Metadata.findByPk(tokenId)) !== null) {
+                // FAILURE: found tokenId in database
+                return null;
+            }
+
+            // If tokenId not in database, add it to the database with the other details
+            const tokenMetadata = await Metadata.create({
+                tokenId: tokenId,
+                name: name,
+                description: description,
+                image: image,
+            });
+
+            return { tokenId: tokenId };
         }
 
         // Instance Methods

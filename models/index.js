@@ -64,7 +64,7 @@ Object.keys(db).forEach((modelName) => {
     console.log(`All models were synchronized successfully`);
 
     // Read from tokens.json, and load initial data into Database
-    const TOKENS_JSON = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "tokens.json")));
+    const TOKENS_JSON = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "initial_tokens.json")));
 
     // // Build creates object that represents data that can be mapped to a database, but doesn't actually communicate to database
     // const metadataObj = Metadata.build(TOKENS_JSON);

@@ -11,67 +11,42 @@ const Metadata = require("./models").Metadata;
 router.get("/:tokenId", async (ctx, next) => {
     const tokenIdParam = parseInt(ctx.params.tokenId);
 
-    try {
-        const tokenMetadata = await Metadata.getTokenMetadata(tokenIdParam);
+    const tokenMetadata = await Metadata.getTokenMetadata(tokenIdParam);
 
-        // FAILURE: tokenId primary key is not in database
-        if (tokenMetadata === null) {
-            ctx.status = 404;
-            ctx.body = {
-                error: `tokenId ${ctx.params.tokenId} does not exist`,
-            };
-            return;
-        }
-
-        // SUCCESS: if tokenId is in database
-        ctx.status = 200;
-        ctx.body = tokenMetadata;
-
-        console.log(`${next}`);
-    } catch (error) {
-        console.error(error);
-        next(error);
+    // FAILURE: tokenId primary key is not in database
+    if (tokenMetadata === null) {
+        ctx.status = 404;
+        ctx.body = {
+            error: `tokenId ${ctx.params.tokenId} does not exist`,
+        };
+        return;
     }
+
+    // SUCCESS: if tokenId is in database
+    ctx.status = 200;
+    ctx.body = tokenMetadata;
 });
 
 router.post("/:tokenId", async (ctx, next) => {
     const body = ctx.request.body;
     console.log(`POST request body for Token ${body.tokenId}`, body, "\n");
 
-    try {
-        const TOKENS_FILE_DATA = await fsPromises.readFile(path.join(__dirname, "tokens.json"));
-        const TOKENS_DB = JSON.parse(TOKENS_FILE_DATA);
-        // FAILURE: tokenId in POST body already exists in the Token Database
-        if (TOKENS_DB[body.tokenId] !== undefined) {
-            ctx.status = 409; // Conflict
-            ctx.body = {
-                error: `tokenId ${body.tokenId} already exists`,
-            };
-            return;
-        }
+    const newTokenIdObj = await Metadata.postTokenMetadata(body.tokenId, body.name, body.description, body.image);
 
-        // SUCCESS: tokenId is not in Token Database
-        // Write to Token database
-        TOKENS_DB[body.tokenId] = {
-            name: body.name,
-            description: body.description,
-            image: body.image,
-        };
-
-        await fsPromises.writeFile(path.join(__dirname, "tokens.json"), JSON.stringify(TOKENS_DB));
-
-        // Success Case, the file was saved
-        console.log(`Token ${body.tokenId}'s metadata was successfully saved to token database`);
-
-        ctx.status = 201; // Created
+    if (newTokenIdObj === null) {
+        // FAILURE: token ID found in database
+        ctx.status = 409; // Conflict
         ctx.body = {
-            tokenId: body.tokenId,
+            error: `tokenId ${body.tokenId} already exists`,
         };
-    } catch (error) {
-        console.error(error);
-        next(error);
+        return;
     }
-    return;
+
+    // SUCCESS: tokenId is not in Token Database
+    console.log(`Token ${body.tokenId}'s metadata was successfully saved to token database`);
+
+    ctx.status = 201; // Created
+    ctx.body = newTokenIdObj;
 });
 
 module.exports = router;
