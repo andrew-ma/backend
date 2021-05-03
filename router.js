@@ -76,7 +76,7 @@ router.post("/token", async (ctx, next) => {
     const description = body.assetDescription === undefined ? "" : body.assetDescription;
 
     const tokenId = parseInt(body.tokenId);
-    if (tokenId === NaN || tokenId < 0 || tokenId > Number.MAX_SAFE_INTEGER) {
+    if (tokenId === NaN || typeof tokenId !== Number || tokenId < 0 || tokenId > Number.MAX_SAFE_INTEGER) {
         ctx.throw(400, "TokenId is invalid");
     }
     const name = `${body.assetName}`;
@@ -118,12 +118,16 @@ router.post("/token", async (ctx, next) => {
     console.log("Successfully saved file:", fileURL);
 
     console.log("Saving values to database:", tokenId, name, description, fileURL);
-    // Add metadata to database under primary key tokenId, and returns null if tokenId is already in database
-    const newTokenIdObj = await Metadata.postTokenMetadata(tokenId, name, description, fileURL);
 
-    if (newTokenIdObj === null) {
-        // FAILURE: token ID found in database
-        ctx.throw(409, `tokenId ${tokenId} already exists`); // CONFLICT
+    // Add metadata to database under primary key tokenId, and returns null if tokenId is already in database
+    try {
+        const newTokenIdObj = await Metadata.postTokenMetadata(tokenId, name, description, fileURL);
+        if (newTokenIdObj === null) {
+            // FAILURE: token ID found in database
+            ctx.throw(409, `tokenId ${tokenId} already exists`); // CONFLICT
+        }
+    } catch (error) {
+        ctx.throw(400, "Error saving values to database");
     }
 
     // SUCCESS: tokenId is not in Token Database
