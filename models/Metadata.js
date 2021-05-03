@@ -1,28 +1,42 @@
-const { Model, DataTypes } = require("sequelize");
+const { Model, DataTypes, Op } = require("sequelize");
+const { BigNumber } = require("@ethersproject/bignumber");
 
 module.exports = (sequelize) => {
     class Metadata extends Model {
         // Class Methods (start with static)
 
         static async getTokenMetadata(tokenId) {
+            if (BigNumber.isBigNumber(tokenId)) {
+                tokenId = tokenId.toString();
+            }
+
             const tokenMetadata = await Metadata.findOne({
                 where: {
                     tokenId: tokenId,
                 },
-                attributes: ["tokenId", "name", "description", "image"],
+                attributes: ["tokenId", "name", "description", "image", "tokenOwner", "price"],
             });
 
-            if (tokenMetadata === null) {
-                // FAILURE:
-                console.log(`Got null metadata for ${tokenId}`);
+            if (tokenMetadata !== null) {
+                // SUCCESS: found metadata (entry not null) for this tokenId
+                console.log(`Found Metadata for tokenId ${tokenId}`, tokenMetadata.toJSON(), "\n");
+                return tokenMetadata.toJSON();
+            } else {
+                // FAILURE: no metadata for this tokenId
+                console.log(`No metadata for tokenId ${tokenId}`);
                 return null;
             }
-
-            console.log("\n", tokenMetadata.toJSON(), "\n");
-            return tokenMetadata.toJSON();
         }
 
-        static async postTokenMetadata(tokenId, name, description, image) {
+        static async postTokenMetadata(tokenId, name, description, image, tokenOwner, price) {
+            if (BigNumber.isBigNumber(tokenId)) {
+                tokenId = tokenId.toString();
+            }
+
+            if (BigNumber.isBigNumber(price)) {
+                price = price.toString();
+            }
+
             // First, check to see if tokenId is already in database
             if ((await Metadata.findByPk(tokenId)) !== null) {
                 // FAILURE: found tokenId in database
@@ -35,9 +49,54 @@ module.exports = (sequelize) => {
                 name: name,
                 description: description,
                 image: image,
+                tokenOwner: tokenOwner,
+                price: price,
+            });
+            return { tokenId: tokenId };
+        }
+
+        static async getAllEntries() {
+            const AllTokenEntries = await Metadata.findAll({
+                attributes: ["tokenId", "name", "description", "image", "tokenOwner", "price"],
+                raw: true,
+            });
+            console.log(AllTokenEntries);
+            return AllTokenEntries;
+        }
+
+        static async getAllEntriesByTokenOwner(tokenOwner) {
+            const TokenOwnerEntries = await Metadata.findAll({
+                where: {
+                    tokenOwner: tokenOwner,
+                },
+                attributes: ["tokenId", "name", "description", "image", "tokenOwner", "price"],
+                raw: true,
+            });
+            console.log(TokenOwnerEntries);
+            return TokenOwnerEntries;
+        }
+
+        static async getEntriesBetweenTokenIds(startingTokenId, endTokenId) {
+            if (BigNumber.isBigNumber(startingTokenId)) {
+                startingTokenId = startingTokenId.toString();
+            }
+            if (BigNumber.isBigNumber(endTokenId)) {
+                endTokenId = endTokenId.toString();
+            }
+
+            // Between startingTokenId AND endTokenId, inclusive both beginning and end values
+            const TokenEntries = await Metadata.findAll({
+                where: {
+                    tokenId: {
+                        [Op.between]: [startingTokenId, endTokenId],
+                    },
+                },
+                attributes: ["tokenId", "name", "description", "image", "tokenOwner", "price"],
+                raw: true,
             });
 
-            return { tokenId: tokenId };
+            console.log(TokenEntries);
+            return TokenEntries;
         }
 
         // Instance Methods
@@ -47,8 +106,7 @@ module.exports = (sequelize) => {
         {
             // Model attributes are defined here
             tokenId: {
-                type: DataTypes.INTEGER,
-                unique: true,
+                type: DataTypes.BIGINT,
                 allowNull: false,
                 primaryKey: true,
             },
@@ -63,6 +121,14 @@ module.exports = (sequelize) => {
             },
             image: {
                 type: DataTypes.STRING,
+                allowNull: false,
+            },
+            tokenOwner: {
+                type: DataTypes.STRING,
+                allowNull: false,
+            },
+            price: {
+                type: DataTypes.BIGINT,
                 allowNull: false,
             },
         },

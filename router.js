@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs").promises;
+const { BigNumber } = require("@ethersproject/bignumber");
 
 // Importing models that were loaded with index.js
 const Metadata = require("./models").Metadata;
@@ -33,7 +34,13 @@ function getTodayDate() {
 }
 
 router.get("/token/:tokenId", async (ctx, next) => {
-    const tokenIdParam = parseInt(ctx.params.tokenId);
+    let tokenIdParam = null;
+    try {
+        tokenIdParam = BigNumber.from(ctx.params.tokenId);
+        tokenIdParam = tokenIdParam.toString();
+    } catch (error) {
+        ctx.throw(400, `Invalid token ID ${tokenIdParam}`);
+    }
 
     const tokenMetadata = await Metadata.getTokenMetadata(tokenIdParam);
 
@@ -47,14 +54,49 @@ router.get("/token/:tokenId", async (ctx, next) => {
     ctx.body = tokenMetadata;
 });
 
+router.get("/tokens/", async (ctx, next) => {
+    // Get All Tokens between Start and End query params
+    console.log(ctx.query);
+    if (ctx.query.start === undefined || ctx.query.end === undefined) {
+        if (ctx.query.owner === undefined) {
+            // If neither start, end, nor owner are passed, then we get all entries
+            const AllEntriesArray = await Metadata.getAllEntries();
+            ctx.status = 200;
+            ctx.body = AllEntriesArray;
+        } else {
+            const TokenEntriesArray = await Metadata.getAllEntriesByTokenOwner(ctx.query.owner);
+            ctx.status = 200;
+            ctx.body = TokenEntriesArray;
+        }
+    } else {
+        let start = null;
+        let end = null;
+        try {
+            start = BigNumber.from(ctx.query.start);
+            end = BigNumber.from(ctx.query.end);
+
+            start = start.toString();
+            end = end.toString();
+        } catch (error) {
+            ctx.throw(400, `Query params start and end must be numbers`);
+        }
+
+        const TokenEntriesArray = await Metadata.getEntriesBetweenTokenIds(start, end);
+        ctx.status = 200;
+        ctx.body = TokenEntriesArray;
+    }
+});
+
 router.post("/token", async (ctx, next) => {
     /* Receives multipart form data with 
     imageFile:  will be saved to UPLOAD_DIR, and saved to DB field "image"
     assetName: saved to DB field "name"
     assetDescription: saved to DB field "description"
     tokenId: saved to DB field "tokenId"
+    
+    tokenOwner: saved to DB field "tokenOwner"
+    assetPrice: saved to DB field "price"
     */
-    console.log("Reached New Token Route");
 
     const ALLOWED_UPLOAD_FILE_MIMETYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
@@ -67,22 +109,40 @@ router.post("/token", async (ctx, next) => {
     const body = ctx.request.body;
     console.log("Body", body);
 
-    // Required Form body: assetName, tokenId
-    if (body.assetName === undefined || body.tokenId === undefined) {
-        ctx.throw(400, "Required data: assetName, tokenId");
+    // Required Form body: assetName, tokenId, assetPrice, tokenOwner
+    if (body.assetName === undefined || body.tokenId === undefined || body.assetPrice === undefined || body.tokenOwner === undefined) {
+        ctx.throw(400, "Required data: assetName, tokenId, assetPrice, tokenOwner");
     }
 
     // assetDescription is optional, set to default empty string
     const description = body.assetDescription === undefined ? "" : body.assetDescription;
 
-    const tokenId = parseInt(body.tokenId);
-    if (tokenId === NaN || typeof tokenId !== Number || tokenId < 0 || tokenId > Number.MAX_SAFE_INTEGER) {
-        ctx.throw(400, "TokenId is invalid");
+    let tokenId = null;
+    try {
+        tokenId = BigNumber.from(body.tokenId);
+        if (tokenId.lt(0)) {
+            throw new Error("tokenId Must be >= 0");
+        }
+    } catch (error) {
+        ctx.throw(400, `TokenId ${body.tokenId} is invalid:  ${error.message}`);
     }
+
+    let assetPrice = null;
+    try {
+        assetPrice = BigNumber.from(body.assetPrice);
+        if (assetPrice.lt(0)) {
+            throw new Error("assetPrice Must be >= 0");
+        }
+    } catch (error) {
+        ctx.throw(400, `assetPrice ${body.assetPrice} is invalid: ${error.message}`);
+    }
+
     const name = `${body.assetName}`;
+    const tokenOwner = `${body.tokenOwner}`;
 
     // Make sure tokenId does not exist in database before saving file
-    if ((await Metadata.findByPk(tokenId)) !== null) {
+    console.log(`${typeof tokenId}`);
+    if ((await Metadata.findByPk(tokenId.toString())) !== null) {
         // FAILURE: found tokenId in database
         ctx.throw(409, `tokenId ${tokenId} already exists`); // CONFLICT
     }
@@ -117,24 +177,25 @@ router.post("/token", async (ctx, next) => {
     const fileURL = `${WEB_ROOT}/${todayDate}/${saveFileName}`;
     console.log("Successfully saved file:", fileURL);
 
-    console.log("Saving values to database:", tokenId, name, description, fileURL);
+    console.log("Saving values to database:", tokenId, name, description, fileURL, tokenOwner, assetPrice);
 
     // Add metadata to database under primary key tokenId, and returns null if tokenId is already in database
+    let newTokenObj = null;
     try {
-        const newTokenIdObj = await Metadata.postTokenMetadata(tokenId, name, description, fileURL);
-        if (newTokenIdObj === null) {
-            // FAILURE: token ID found in database
-            ctx.throw(409, `tokenId ${tokenId} already exists`); // CONFLICT
-        }
+        newTokenIdObj = await Metadata.postTokenMetadata(tokenId.toString(), name, description, fileURL, tokenOwner, assetPrice.toString());
     } catch (error) {
-        ctx.throw(400, "Error saving values to database");
+        ctx.throw(400, `Values: ${tokenId}, ${name}, ${description}, ${fileURL}: ${error.message}`);
     }
 
-    // SUCCESS: tokenId is not in Token Database
-    console.log(`Token ${tokenId}'s metadata was successfully saved to token database`);
-
-    ctx.status = 201; // Created
-    ctx.body = newTokenIdObj;
+    if (newTokenIdObj === null) {
+        // FAILURE: found entry in database
+        ctx.throw(409, `Existing entry in token Database for ${tokenId}`);
+    } else {
+        // SUCCESS: tokenId is not in Token Database
+        console.log(`Token ${tokenId}'s metadata was successfully saved to token database`);
+        ctx.status = 201; // Created
+        ctx.body = newTokenIdObj;
+    }
 });
 
 module.exports = router;

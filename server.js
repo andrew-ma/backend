@@ -42,7 +42,7 @@ app.use(async (ctx, next) => {
             ctx.body = err.message;
         }
 
-        // console.error(ctx.status, ctx.body)
+        console.error(ctx.status, ctx.body);
         ctx.app.emit("error", err, ctx);
     }
 });
